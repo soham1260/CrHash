@@ -35,4 +35,6 @@ __constant__ static uint32_t K[] = {
 
 #define CIRCULAR_SHIFT(N,X) ((((X) << (N)) & 0xFFFFFFFF) | ((X) >> (32-(N))))
 
+__constant__ static uint32_t target_hash_gpu[5];    
+
 #endif

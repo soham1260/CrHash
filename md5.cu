@@ -114,19 +114,10 @@ __device__  void to_md5String(char *input, uint8_t *result, size_t input_len){
     md5Finalize(&obj, result);
 }
 
-__global__ void crack_md5(uint8_t* input, char* result, size_t input_len, uint64_t total, int* found){
-
-    extern __shared__ uint8_t target_hash[];
-
-    if (threadIdx.x < 16)
-    {
-        target_hash[threadIdx.x] = input[threadIdx.x];
-    }
+__global__ void crack_md5(char* result, size_t input_len, uint64_t total, int* found){
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
-
-    __syncthreads();
     
     char pwd[MAX_PWD_SIZE]; // max password length MAX_PWD_SIZE-1 chars
     uint8_t output[16];
@@ -141,7 +132,7 @@ __global__ void crack_md5(uint8_t* input, char* result, size_t input_len, uint64
         bool match = true;
         for (int j = 0; j < 16; j++) 
         {            
-            if (output[j] != target_hash[j]) 
+            if (output[j] != target_hash_gpu[j]) 
             {
                 match = false;
                 break;
@@ -170,9 +161,7 @@ __global__ void crack_md5(uint8_t* input, char* result, size_t input_len, uint64
         sscanf(&hash[i * 2], "%2hhx", &target_hash[i]);
     }
 
-    uint8_t* target_hash_gpu;
-    cudaMalloc(&target_hash_gpu, 16*sizeof(uint8_t));
-    cudaMemcpy(target_hash_gpu, target_hash, 16*sizeof(uint8_t), cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(target_hash_gpu,target_hash,16*sizeof(uint8_t),0,cudaMemcpyHostToDevice);
 
     char* password;
     cudaMalloc(&password, MAX_PWD_SIZE);
@@ -192,7 +181,7 @@ __global__ void crack_md5(uint8_t* input, char* result, size_t input_len, uint64
     cudaOccupancyMaxPotentialBlockSize(&blocks,&threads,crack_md5,5*sizeof(unsigned),0);
     std::cout<<"Launch Config: "<<blocks<<" Blocks, "<<threads<<" Threads per Block"<< std::endl;
 
-    crack_md5<<<blocks,threads,16*sizeof(uint8_t),0>>>(target_hash_gpu,password,input_len,total,found);
+    crack_md5<<<blocks,threads,16*sizeof(uint8_t),0>>>(password,input_len,total,found);
     cudaError_t err = cudaGetLastError();
     if(err != cudaSuccess)
     {
@@ -213,7 +202,6 @@ __global__ void crack_md5(uint8_t* input, char* result, size_t input_len, uint64
 
     std::cout<<"Found: "<<cracked_password<<std::endl;
 
-    cudaFree(target_hash_gpu);
     cudaFree(password);
     cudaFree(found);
 }

@@ -200,19 +200,10 @@ __device__ void to_sha1String(char *input, uint32_t *result, size_t input_len)
     }
 }
 
-__global__ void crack_sha1(uint32_t* input, char* result, size_t input_len, uint64_t total, int* found){
-
-    extern __shared__ uint32_t target_hash[];
-
-    if (threadIdx.x < 5)
-    {
-        target_hash[threadIdx.x] = input[threadIdx.x];
-    }
+__global__ void crack_sha1(char* result, size_t input_len, uint64_t total, int* found){
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
-
-    __syncthreads();
     
     char pwd[MAX_PWD_SIZE]; // max password length MAX_PWD_SIZE-1 chars
     uint32_t output[5];
@@ -227,7 +218,7 @@ __global__ void crack_sha1(uint32_t* input, char* result, size_t input_len, uint
         bool match = true;
         for (int j = 0; j < 5; j++) 
         {            
-            if (output[j] != target_hash[j]) 
+            if (output[j] != target_hash_gpu[j]) 
             {
                 match = false;
                 break;
@@ -256,9 +247,7 @@ void sha1(char* hash, size_t input_len)
         sscanf(&hash[i * 8], "%8x", &target_hash[i]);
     }
 
-    uint32_t* target_hash_gpu;
-    cudaMalloc(&target_hash_gpu, 5*sizeof(uint32_t));
-    cudaMemcpy(target_hash_gpu, target_hash, 5*sizeof(uint32_t), cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(target_hash_gpu,target_hash,5*sizeof(uint32_t),0,cudaMemcpyHostToDevice);
 
     char* password;
     cudaMalloc(&password, MAX_PWD_SIZE);
@@ -278,7 +267,7 @@ void sha1(char* hash, size_t input_len)
     cudaOccupancyMaxPotentialBlockSize(&blocks,&threads,crack_sha1,5*sizeof(unsigned),0);
     std::cout<<"Launch Config: "<<blocks<<" Blocks, "<<threads<<" Threads per Block"<< std::endl;
 
-    crack_sha1<<<blocks,threads,5*sizeof(uint32_t),0>>>(target_hash_gpu,password,input_len,total,found);
+    crack_sha1<<<blocks,threads,5*sizeof(uint32_t),0>>>(password,input_len,total,found);
     cudaError_t err = cudaGetLastError();
     if(err != cudaSuccess)
     {
@@ -299,7 +288,6 @@ void sha1(char* hash, size_t input_len)
 
     std::cout<<"Found: "<<cracked_password<<std::endl;
 
-    cudaFree(target_hash_gpu);
     cudaFree(password);
     cudaFree(found);
 }
