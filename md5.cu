@@ -1,6 +1,8 @@
 #include "md5.cuh"
 #include "defs.cuh"
 #include <iostream>
+#include <map>
+#include <algorithm>
 
 __device__  void md5Step(uint32_t *buffer, uint32_t *input){
     uint32_t AA = buffer[0];
@@ -114,7 +116,7 @@ __device__  void to_md5String(char *input, uint8_t *result, size_t input_len){
     md5Finalize(&obj, result);
 }
 
-__global__ void crack_md5(char* result, size_t input_len, uint64_t total, int* found){
+__global__ void crack_md5(char* results, size_t input_len, uint64_t total, int* founds, int current_batch) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -124,31 +126,33 @@ __global__ void crack_md5(char* result, size_t input_len, uint64_t total, int* f
 
     for (uint64_t i = idx; i < total; i+=stride)
     {
-        if (*found) return;
-
         indexToPassword(i, pwd, input_len);
-        to_md5String(pwd, output,input_len);
+        to_md5String(pwd, output, input_len);
 
-        bool match = true;
-        for (int j = 0; j < 16; j++) 
-        {            
-            if (output[j] != target_hash_gpu[j]) 
-            {
-                match = false;
-                break;
-            }
-        }
-
-        if (match) 
+        for (int k = 0; k < current_batch; k++) 
         {
-            if (!*found)
-            {
-                *found = 1;
-                for (int j = 0; j < input_len; j++)
-                   result[j] = pwd[j];
-                result[input_len] = '\0';
+            if (founds[k]) continue; 
+
+            bool match = true;
+            for (int j = 0; j < 16; j++) 
+            {            
+                if (output[j] != target_hash_gpu[k][j]) 
+                {
+                    match = false;
+                    break;
+                }
             }
-            return;
+
+            if (match) 
+            {
+                founds[k] = 1;
+                int offset = k * MAX_PWD_SIZE;
+                for (int j = 0; j < input_len; j++) 
+                {
+                    results[offset + j] = pwd[j];
+                }
+                results[offset + input_len] = '\0';
+            }
         }
     }
 }

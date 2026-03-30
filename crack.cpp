@@ -53,7 +53,7 @@ void process_batch(std::string filename) {
 
     file.close();
 
-    std::cout << "Successfully loaded " << job_queue.size() << " target hashes. Beginning batch processing..." << std::endl;
+    std::cout << "Successfully loaded " << job_queue.size() << " target hashes. Beginning batch processing" << std::endl;
     
     if (expected_algo == "md5")
     {
@@ -61,7 +61,7 @@ void process_batch(std::string filename) {
     }
     else if (expected_algo == "sha1")
     {
-        sha1(job_queue);
+        // sha1(job_queue);
     }
     
     std::cout << "Batch processing complete." << std::endl;
@@ -95,8 +95,8 @@ int main(int argc, char *argv[])
                 std::cout << "Invalid size" << std::endl;
                 return 0;
             }
-            Job job{algo, hash, input_len};
-            md5({job});
+            std::vector<Job> jobs = {{algo, hash, input_len}};
+            md5(jobs);
         }
         else if (algo == "sha1") {
             if (hash.length() != 40) {
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
                 return 0;
             }
             Job job{algo, hash, input_len};
-            sha1({job});
+            sha1((char*)hash.c_str(),input_len);
         }
         else {
             std::cout << "Invalid Algo" << std::endl;
@@ -116,8 +116,8 @@ int main(int argc, char *argv[])
     }
     else {
         std::cout << "Usage:" << std::endl;
-        std::cout << "  Single: ./crack <algo> <hash> <len>" << std::endl;
-        std::cout << "  Batch:  ./crack batch <filename>" << std::endl;
+        std::cout << "> Single: ./crack <algo> <hash> <len>" << std::endl;
+        std::cout << "> Batch:  ./crack batch <filename>" << std::endl;
         return 0;
     }
 }
