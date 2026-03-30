@@ -67,6 +67,39 @@ void process_batch(std::string filename) {
     std::cout << "Batch processing complete." << std::endl;
 }
 
+void process_dictionary(std::string filename, std::string algo) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cout << "Failed to open batch file: " << filename << std::endl;
+        return;
+    }
+
+    std::string line;
+    std::vector<std::string> passwords;
+
+    while (std::getline(file, line)) {
+        
+        if (line.empty()) continue; 
+
+        passwords.push_back(line);
+    }
+
+    file.close();
+
+    std::cout << "Successfully loaded " << passwords.size() << " passwords. Beginning dictionary attack" << std::endl;
+    
+    if (algo == "md5")
+    {
+        md5_dict(passwords);
+    }
+    else if (algo == "sha1")
+    {
+        sha1_dict(passwords);
+    }
+    
+    std::cout << "Attack complete." << std::endl;
+}
+
 int main(int argc, char *argv[])
 {
     if(argc < 3) {
@@ -80,8 +113,7 @@ int main(int argc, char *argv[])
         process_batch(argv[2]);
         return 0;
     }
-
-    if(argc == 4) {
+    else if(argc == 4) {
         std::string algo = argv[1];
         std::string hash = argv[2];
         int input_len = atoi(argv[3]);
@@ -114,10 +146,30 @@ int main(int argc, char *argv[])
             std::cout << "Invalid Algo" << std::endl;
         }
     }
+    else if (argc == 5 && strcmp(argv[1], "dict") == 0)
+    {
+        std::string file = argv[2];
+        std::string algo = argv[3];
+        std::string hash = argv[4];
+
+        if (algo == "md5" && hash.length() == 32)
+        {
+            process_dictionary(file,"md5");
+        }
+        else if (algo == "sha1" && hash.length() == 40)
+        {
+            process_dictionary(file,"md5");
+        }
+        else
+        {
+            std::cout << "Invalid algo or hash size" << std::endl;
+        }
+    }
     else {
         std::cout << "Usage:" << std::endl;
-        std::cout << "> Single: ./crack <algo> <hash> <len>" << std::endl;
-        std::cout << "> Batch:  ./crack batch <filename>" << std::endl;
+        std::cout << "> Single:      ./crack <algo> <hash> <len>" << std::endl;
+        std::cout << "> Batch:       ./crack batch <filename>" << std::endl;
+        std::cout << "> Dictionary:  ./crack dict <filename> <algo> <hash>" << std::endl;
         return 0;
     }
 }

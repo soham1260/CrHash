@@ -313,3 +313,8 @@ void sha1(std::vector<Job>& jobs)
         }
     }
 }
+
+void sha1_dict(std::vector<std::string>& passwords)
+{
+    
+}

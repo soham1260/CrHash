@@ -228,3 +228,8 @@ void md5(std::vector<Job>& jobs)
         }
     }
 }
+
+void md5_dict(std::vector<std::string>& passwords)
+{
+    
+}
