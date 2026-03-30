@@ -61,7 +61,7 @@ void process_batch(std::string filename) {
     }
     else if (expected_algo == "sha1")
     {
-        // sha1(job_queue);
+        sha1(job_queue);
     }
     
     std::cout << "Batch processing complete." << std::endl;
@@ -107,8 +107,8 @@ int main(int argc, char *argv[])
                 std::cout << "Invalid size" << std::endl;
                 return 0;
             }
-            Job job{algo, hash, input_len};
-            sha1((char*)hash.c_str(),input_len);
+            std::vector<Job> jobs = {{algo, hash, input_len}};
+            sha1(jobs);
         }
         else {
             std::cout << "Invalid Algo" << std::endl;

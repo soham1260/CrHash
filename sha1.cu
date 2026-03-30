@@ -200,7 +200,7 @@ __device__ void to_sha1String(char *input, uint32_t *result, size_t input_len)
     }
 }
 
-__global__ void crack_sha1(char* result, size_t input_len, uint64_t total, int* found){
+__global__ void crack_sha1(char* results, size_t input_len, uint64_t total, int* founds, int current_batch){
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -210,32 +210,35 @@ __global__ void crack_sha1(char* result, size_t input_len, uint64_t total, int* 
 
     for (uint64_t i = idx; i < total; i+=stride)
     {
-        if (*found) return;
-
         indexToPassword(i, pwd, input_len);
         to_sha1String(pwd, output,input_len);
 
-        bool match = true;
-        for (int j = 0; j < 5; j++) 
-        {            
-            if (output[j] != target_hash_gpu[j]) 
-            {
-                match = false;
-                break;
-            }
-        }
-
-        if (match) 
+        for (int k = 0; k < current_batch; k++)
         {
-            if (!*found)
-            {
-                *found = 1;
-                for (int j = 0; j < input_len; j++)
-                   result[j] = pwd[j];
-                result[input_len] = '\0';
+            if (founds[k]) continue; 
+
+            bool match = true;
+            for (int j = 0; j < 5; j++) 
+            {            
+                if (output[j] != target_hash_gpu[k][j]) 
+                {
+                    match = false;
+                    break;
+                }
             }
-            return;
+
+            if (match) 
+            {
+                founds[k] = 1;
+                int offset = k * MAX_PWD_SIZE;
+                for (int j = 0; j < input_len; j++)
+                {
+                    results[j] = pwd[j];
+                }
+                results[input_len] = '\0';
+            }
         }
+        
     }
 }
 

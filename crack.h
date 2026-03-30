@@ -6,6 +6,7 @@
 #include <vector>
 
 #define MAX_PWD_SIZE 8
+#define MAX_BATCH_SIZE 1024
 
 struct Job {
     std::string algo;
@@ -14,6 +15,6 @@ struct Job {
 };
 
 void md5(std::vector<Job>& jobs);
-void sha1(char* hash, size_t input_len);
+void sha1(std::vector<Job>& jobs);
 
 #endif
