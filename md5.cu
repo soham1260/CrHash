@@ -200,7 +200,7 @@ void md5(std::vector<Job>& jobs)
             int threads;
             cudaOccupancyMaxPotentialBlockSize(&blocks, &threads, crack_md5, 0, 0);
 
-            crack_md5<<<blocks, threads>>>(passwords_gpu, pair.first, total, found_gpu, current_batch);
+            crack_md5<<<blocks*4, threads>>>(passwords_gpu, pair.first, total, found_gpu, current_batch);
             
             cudaError_t err = cudaGetLastError();
             if(err != cudaSuccess) 

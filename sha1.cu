@@ -1,6 +1,7 @@
 #include "sha1.cuh"
 #include "defs.cuh"
 #include <iostream>
+#include <map>
 
 __device__ void SHA1ProcessMessageBlock(SHA1 *obj)
 {
@@ -233,64 +234,82 @@ __global__ void crack_sha1(char* results, size_t input_len, uint64_t total, int*
                 int offset = k * MAX_PWD_SIZE;
                 for (int j = 0; j < input_len; j++)
                 {
-                    results[j] = pwd[j];
+                    results[offset + j] = pwd[j];
                 }
-                results[input_len] = '\0';
+                results[offset + input_len] = '\0';
             }
         }
-        
     }
 }
 
-void sha1(char* hash, size_t input_len)
+void sha1(std::vector<Job>& jobs)
 {
-    uint32_t target_hash[5];
-    for (int i = 0; i < 5; i++) 
+    std::map<int, std::vector<std::string>> jobs_by_len;
+    for (const auto& job : jobs) 
     {
-        sscanf(&hash[i * 8], "%8x", &target_hash[i]);
+        jobs_by_len[job.input_len].push_back(job.hash);
     }
 
-    cudaMemcpyToSymbol(target_hash_gpu,target_hash,5*sizeof(uint32_t),0,cudaMemcpyHostToDevice);
-
-    char* password;
-    cudaMalloc(&password, MAX_PWD_SIZE);
-    cudaMemset(password, 0, MAX_PWD_SIZE);
-
-    uint64_t total = 1;
-    for (int i = 0; i < input_len; i++)
-        total*=94;
-    
-    int* found;
-    cudaMalloc(&found, sizeof(int));
-    cudaMemset(found, 0, sizeof(int));
-
-    int blocks;
-    int threads;
-    
-    cudaOccupancyMaxPotentialBlockSize(&blocks,&threads,crack_sha1,5*sizeof(unsigned),0);
-    std::cout<<"Launch Config: "<<blocks<<" Blocks, "<<threads<<" Threads per Block"<< std::endl;
-
-    crack_sha1<<<blocks,threads,5*sizeof(uint32_t),0>>>(password,input_len,total,found);
-    cudaError_t err = cudaGetLastError();
-    if(err != cudaSuccess)
+    for (const auto& pair : jobs_by_len) 
     {
-        std::cout<<"Error: "<<cudaGetErrorString(err);
+        uint64_t total = 1;
+        for (int i = 0; i < pair.first; i++) total *= 94;
+
+        int total_hashes = pair.second.size();
+
+        for (int offset = 0; offset < total_hashes; offset += MAX_BATCH_SIZE) 
+        {
+            int current_batch = std::min(MAX_BATCH_SIZE, total_hashes - offset);
+
+            uint32_t host_hash_buffer[MAX_BATCH_SIZE][5] = {0};
+            for (int i = 0; i < current_batch; i++) 
+            {
+                const std::string& hash_str = pair.second[offset + i];
+                for (int j = 0; j < 5; j++) 
+                {
+                    sscanf(&hash_str[j * 8], "%8x", &host_hash_buffer[i][j]); 
+                }
+            }
+
+            cudaMemcpyToSymbol(target_hash_gpu, host_hash_buffer, current_batch * 5 * sizeof(uint32_t), 0, cudaMemcpyHostToDevice);
+
+            char* passwords_gpu;
+            int* found_gpu;
+            cudaMalloc(&passwords_gpu, current_batch * MAX_PWD_SIZE);
+            cudaMemset(passwords_gpu, 0, current_batch * MAX_PWD_SIZE);
+            
+            cudaMalloc(&found_gpu, current_batch * sizeof(int));
+            cudaMemset(found_gpu, 0, current_batch * sizeof(int));
+
+            int blocks;
+            int threads;
+            cudaOccupancyMaxPotentialBlockSize(&blocks, &threads, crack_sha1, 0, 0);
+
+            crack_sha1<<<blocks*4, threads>>>(passwords_gpu, pair.first, total, found_gpu, current_batch);
+
+            cudaError_t err = cudaGetLastError();
+            if(err != cudaSuccess) 
+            {
+                std::cout << "Kernel Launch Error: " << cudaGetErrorString(err) << std::endl;
+            }
+            cudaDeviceSynchronize();
+
+            int found_host[MAX_BATCH_SIZE] = {0};
+            char passwords_host[MAX_BATCH_SIZE][MAX_PWD_SIZE] = {0};
+
+            cudaMemcpy(found_host, found_gpu, current_batch * sizeof(int), cudaMemcpyDeviceToHost);
+            cudaMemcpy(passwords_host, passwords_gpu, current_batch * MAX_PWD_SIZE, cudaMemcpyDeviceToHost);
+
+            for (int i = 0; i < current_batch; i++) 
+            {
+                if (found_host[i]) 
+                {
+                    std::cout << "Match found - Hash: " << pair.second[offset + i] << " -> Password: " << passwords_host[i] << std::endl;
+                }
+            }
+
+            cudaFree(passwords_gpu);
+            cudaFree(found_gpu);
+        }
     }
-    cudaDeviceSynchronize();
-
-    char cracked_password[MAX_PWD_SIZE];
-    memset(cracked_password,0,MAX_PWD_SIZE);
-    cudaMemcpy(cracked_password,password,MAX_PWD_SIZE,cudaMemcpyDeviceToHost);
-
-    
-    err = cudaGetLastError();
-    if(err != cudaSuccess)
-    {
-        std::cout<<"Error: "<<cudaGetErrorString(err);
-    }
-
-    std::cout<<"Found: "<<cracked_password<<std::endl;
-
-    cudaFree(password);
-    cudaFree(found);
 }
