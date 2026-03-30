@@ -229,7 +229,68 @@ void md5(std::vector<Job>& jobs)
     }
 }
 
-void md5_dict(std::vector<std::string>& passwords)
+__device__ int compare_hashes(const uint8_t* a, const uint8_t* b) {
+    for (int i = 0; i < 16; i++) {
+        if (a[i] < b[i]) return -1;
+        if (a[i] > b[i]) return 1;
+    }
+    return 0;
+}
+
+__global__ void crack_md5_dict(char* __restrict__ passwords, uint8_t* __restrict__ hashes, char* results, int* founds, int total_targets, int dict_size)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    uint8_t output[16];
+
+    for (int i = idx; i < dict_size; i += stride) 
+    {
+        char* curr_password = &passwords[i * MAX_PWD_SIZE_DICT];
+
+        int word_len = 0;
+        while (word_len < MAX_PWD_SIZE_DICT && curr_password[word_len] != '\0') 
+        {
+            word_len++;
+        }
+        if (word_len == 0) continue;
+
+        to_md5String(curr_password, output, word_len);
+
+        int left = 0;
+        int right = total_targets-1;
+        int match_index = -1;
+
+        while (left <= right) 
+        {
+            int mid = left+(right-left)/2;
+            int cmp = compare_hashes(output, &hashes[mid * 16]);
+
+            if (cmp == 0) 
+            {
+                match_index = mid;
+                break;
+            }
+            if (cmp < 0)
+                right = mid-1;
+            else
+                left = mid+1;
+        }
+
+        if (match_index != -1) 
+        {
+            founds[match_index] = 1;
+            int offset = match_index * MAX_PWD_SIZE_DICT;
+            for (int j = 0; j < word_len; j++) 
+            {
+                results[offset + j] = curr_password[j];
+            }
+            results[offset + word_len] = '\0';
+        }
+    }
+}
+
+void md5_dict(std::vector<std::string>& passwords, std::vector<std::string>& hashes)
 {
     
 }

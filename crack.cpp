@@ -67,7 +67,7 @@ void process_batch(std::string filename) {
     std::cout << "Batch processing complete." << std::endl;
 }
 
-void process_dictionary(std::string filename, std::string algo) {
+void process_dictionary(std::string filename, std::string algo, std::string hash) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cout << "Failed to open batch file: " << filename << std::endl;
@@ -90,11 +90,15 @@ void process_dictionary(std::string filename, std::string algo) {
     
     if (algo == "md5")
     {
-        md5_dict(passwords);
+        std::vector<std::string> hashes;
+        hashes.push_back(hash);
+        md5_dict(passwords,hashes);
     }
     else if (algo == "sha1")
     {
-        sha1_dict(passwords);
+        std::vector<std::string> hashes;
+        hashes.push_back(hash);
+        sha1_dict(passwords,hashes);
     }
     
     std::cout << "Attack complete." << std::endl;
@@ -154,11 +158,11 @@ int main(int argc, char *argv[])
 
         if (algo == "md5" && hash.length() == 32)
         {
-            process_dictionary(file,"md5");
+            process_dictionary(file,"md5",hash);
         }
         else if (algo == "sha1" && hash.length() == 40)
         {
-            process_dictionary(file,"md5");
+            process_dictionary(file,"md5",hash);
         }
         else
         {

@@ -7,6 +7,7 @@
 
 #define MAX_PWD_SIZE 8
 #define MAX_BATCH_SIZE 1024
+#define MAX_PWD_SIZE_DICT 16
 
 struct Job {
     std::string algo;
@@ -16,7 +17,7 @@ struct Job {
 
 void md5(std::vector<Job>& jobs);
 void sha1(std::vector<Job>& jobs);
-void md5_dict(std::vector<std::string>& passwords);
-void sha1_dict(std::vector<std::string>& passwords);
+void md5_dict(std::vector<std::string>& passwords, std::vector<std::string>& hashes);
+void sha1_dict(std::vector<std::string>& passwords, std::vector<std::string>& hashes);
 
 #endif
