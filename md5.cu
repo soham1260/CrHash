@@ -232,15 +232,16 @@ void md5(std::vector<Job>& jobs)
     }
 }
 
-__device__ int compare_hashes(const uint8_t* a, const uint8_t* b) {
-    for (int i = 0; i < 16; i++) {
+__device__ int compare_hashes_md5(const uint8_t* a, const uint8_t* b) {
+    for (int i = 0; i < 16; i++) 
+    {
         if (a[i] < b[i]) return -1;
         if (a[i] > b[i]) return 1;
     }
     return 0;
 }
 
-__global__ void crack_md5_dict(char* __restrict__ passwords, uint8_t* __restrict__ hashes, char* results, int* founds, int total_targets, int dict_size)
+__global__ void crack_md5_dict(char* passwords, uint8_t* hashes, char* results, int* founds, int total_targets, int dict_size)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -267,7 +268,7 @@ __global__ void crack_md5_dict(char* __restrict__ passwords, uint8_t* __restrict
         while (left <= right) 
         {
             int mid = left+(right-left)/2;
-            int cmp = compare_hashes(output, &hashes[mid * 16]);
+            int cmp = compare_hashes_md5(output, &hashes[mid * 16]);
 
             if (cmp == 0) 
             {
@@ -337,7 +338,7 @@ void md5_dict(std::vector<std::string>& passwords, std::vector<std::string>& has
     int blocks, threads;
     cudaOccupancyMaxPotentialBlockSize(&blocks, &threads, crack_md5_dict, 0, 0);
 
-    crack_md5_dict<<<blocks, threads>>>(dict_gpu, target_hashes_gpu, results_gpu, founds_gpu, total_targets, passwords_size);
+    crack_md5_dict<<<blocks*4, threads>>>(dict_gpu, target_hashes_gpu, results_gpu, founds_gpu, total_targets, passwords_size);
 
     int* founds_host = new int[total_targets];
     char* results_host = new char(total_targets * MAX_PWD_SIZE_DICT);

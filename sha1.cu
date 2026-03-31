@@ -2,6 +2,7 @@
 #include "defs.cuh"
 #include <iostream>
 #include <map>
+#include <algorithm>
 
 __device__ void SHA1ProcessMessageBlock(SHA1 *obj)
 {
@@ -314,7 +315,64 @@ void sha1(std::vector<Job>& jobs)
     }
 }
 
-void sha1_dict(std::vector<std::string>& passwords, std::vector<std::string>& hashes)
+__device__ int compare_hashes_sha1(const uint32_t* a, const uint32_t* b) {
+    for (int i = 0; i < 5; i++) 
+    {
+        if (a[i] < b[i]) return -1;
+        if (a[i] > b[i]) return 1;
+    }
+    return 0;
+}
+
+__global__ void crack_sha1_dict(char* passwords, uint32_t* hashes, char* results, int* founds, int total_targets, int dict_size)
 {
-    
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    uint32_t output[5];
+
+    for (int i = idx; i < dict_size; i += stride) 
+    {
+        char* curr_password = &passwords[i * MAX_PWD_SIZE_DICT];
+
+        int word_len = 0;
+        while (word_len < MAX_PWD_SIZE_DICT && curr_password[word_len] != '\0') 
+        {
+            word_len++;
+        }
+        if (word_len == 0) continue;
+
+        to_sha1String(curr_password, output, word_len);
+
+        int left = 0;
+        int right = total_targets-1;
+        int match_index = -1;
+
+        while (left <= right) 
+        {
+            int mid = left+(right-left)/2;
+            int cmp = compare_hashes_sha1(output, &hashes[mid * 5]);
+
+            if (cmp == 0) 
+            {
+                match_index = mid;
+                break;
+            }
+            if (cmp < 0)
+                right = mid-1;
+            else
+                left = mid+1;
+        }
+
+        if (match_index != -1) 
+        {
+            founds[match_index] = 1;
+            int offset = match_index * MAX_PWD_SIZE_DICT;
+            for (int j = 0; j < word_len; j++) 
+            {
+                results[offset + j] = curr_password[j];
+            }
+            results[offset + word_len] = '\0';
+        }
+    }
 }

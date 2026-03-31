@@ -126,6 +126,11 @@ int main(int argc, char *argv[])
         std::vector<Job> jobs;
         if (load_brute_batch(argv[3], jobs, algo)) 
         {
+            if(jobs.size() == 0)
+            {
+                std::cout << "No valid input hashes!" << std::endl;
+                return 0;
+            }
             std::cout << "Successfully loaded " << jobs.size() << " target hashes" << std::endl;
             if (algo == "md5") md5(jobs);
             else sha1(jobs);
@@ -141,6 +146,12 @@ int main(int argc, char *argv[])
         
         if (!load_passwords(dict_file, passwords)) return 0;
 
+        if(passwords.size() == 0)
+        {
+            std::cout << "Dictionary has no passwords!" << std::endl;
+            return 0;
+        }
+
         std::string type = argv[4];
 
         if (type == "batch" && argc == 6) 
@@ -148,6 +159,11 @@ int main(int argc, char *argv[])
             std::vector<std::string> hashes;
             if (load_dict_batch(argv[5], hashes, algo)) 
             {
+                if(hashes.size() == 0)
+                {
+                    std::cout << "No valid input hashes!" << std::endl;
+                    return 0;
+                }
                 std::cout << "Successfully loaded " << passwords.size() << " passwords and " << hashes.size() << " target hashes" << std::endl;
                 if (algo == "md5") md5_dict(passwords, hashes);
                 else sha1_dict(passwords, hashes);
