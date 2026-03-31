@@ -376,3 +376,72 @@ __global__ void crack_sha1_dict(char* passwords, uint32_t* hashes, char* results
         }
     }
 }
+
+void sha1_dict(std::vector<std::string>& passwords, std::vector<std::string>& hashes)
+{
+    int total_targets = hashes.size();
+
+    std::sort(hashes.begin(), hashes.end());
+
+    uint32_t* targets_hashes = new uint32_t[total_targets * 5];
+
+    for (int i = 0; i < total_targets; i++) 
+    {
+        const std::string& temp = hashes[i];
+        for (int j = 0; j < 5; j++) 
+        {
+            sscanf(&temp[j*8], "%8x", &targets_hashes[i*5+j]);
+        }
+    }
+
+    uint32_t* target_hashes_gpu;
+    cudaMalloc(&target_hashes_gpu, total_targets * 5 * sizeof(uint32_t));
+    cudaMemcpy(target_hashes_gpu, targets_hashes, total_targets * 5 * sizeof(uint32_t), cudaMemcpyHostToDevice);
+    
+    int* founds_gpu;
+    cudaMalloc(&founds_gpu, total_targets * sizeof(int));
+    cudaMemset(founds_gpu, 0, total_targets * sizeof(int));
+
+    int passwords_size = passwords.size();
+    
+    char* host_dict_buffer = new char[passwords_size * MAX_PWD_SIZE_DICT];
+    memset(host_dict_buffer, 0, passwords_size * MAX_PWD_SIZE_DICT);
+    for (int i = 0; i < passwords_size; i++) // Individual cudaMemcpy took time, create host buffer and copy entire dictionary at once
+    {
+        strncpy(&host_dict_buffer[i * MAX_PWD_SIZE_DICT], passwords[i].c_str(), MAX_PWD_SIZE_DICT - 1);
+    }
+
+    char* dict_gpu;
+    cudaMalloc(&dict_gpu, passwords_size * MAX_PWD_SIZE_DICT);
+    cudaMemcpy(dict_gpu,host_dict_buffer,passwords_size * MAX_PWD_SIZE_DICT,cudaMemcpyHostToDevice);
+
+    char* results_gpu;
+    cudaMalloc(&results_gpu, total_targets * sizeof(char) * MAX_PWD_SIZE_DICT);
+    
+    int blocks, threads;
+    cudaOccupancyMaxPotentialBlockSize(&blocks, &threads, crack_sha1_dict, 0, 0);
+
+    crack_sha1_dict<<<blocks*4, threads>>>(dict_gpu, target_hashes_gpu, results_gpu, founds_gpu, total_targets, passwords_size);
+
+    int* founds_host = new int[total_targets];
+    char* results_host = new char(total_targets * MAX_PWD_SIZE_DICT);
+
+    cudaMemcpy(founds_host, founds_gpu, total_targets * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(results_host, results_gpu, total_targets * MAX_PWD_SIZE_DICT, cudaMemcpyDeviceToHost);
+
+    int f = 0;
+    for (int i = 0; i < total_targets; i++) 
+    {
+        if (founds_host[i]) 
+        {
+            f = 1;
+            std::cout << "Match found - Hash: " << hashes[i] << " -> Password: " << (results_host + i * MAX_PWD_SIZE_DICT) << std::endl;
+        }
+    }
+    if(!f) std::cout << "No match found"<< std::endl;
+
+    cudaFree(target_hashes_gpu);
+    cudaFree(founds_gpu);
+    cudaFree(dict_gpu);
+    cudaFree(results_gpu);
+}
