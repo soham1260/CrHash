@@ -6,174 +6,196 @@
 #include <cstring>
 #include <vector>
 
-void process_batch(std::string filename) {
+bool load_passwords(const std::string& filename, std::vector<std::string>& passwords) 
+{
     std::ifstream file(filename);
-    if (!file.is_open()) {
+    if (!file.is_open()) 
+    {
         std::cout << "Failed to open batch file: " << filename << std::endl;
-        return;
+        return false;
     }
-
     std::string line;
-    std::string expected_algo = "";
-    int line_number = 0;
-    
-    std::vector<Job> job_queue;
-
-    while (std::getline(file, line)) {
-        line_number++;
-        
-        if (line.empty()) continue; 
-
-        std::istringstream iss(line);
-        std::string algo, hash;
-        int input_len;
-
-        if (!(iss >> algo >> hash >> input_len)) {
-            std::cout << "Line " << line_number << ": Parsing error. Skipping." << std::endl;
-            continue;
-        }
-
-        if (expected_algo.empty()) {
-            if (algo == "md5" || algo == "sha1") {
-                expected_algo = algo;
-                std::cout << "Batch locked to algorithm: " << expected_algo << std::endl;
-            } else {
-                std::cout << "Line " << line_number << ": Invalid base algorithm (" << algo << "). Aborting batch." << std::endl;
-                return;
-            }
-        }
-
-        if (algo != expected_algo) {
-            std::cout << "Line " << line_number << ": Algorithm mismatch. Expected " << expected_algo << " but got " << algo << ". Skipping." << std::endl;
+    int line_no = 0;
+    while (std::getline(file, line)) 
+    {
+        line_no++;
+        if (line.empty()) continue;
+        if (line.length() > MAX_PWD_SIZE_DICT)
+        {
+            std::cout << "Invalid password size on line number" << line_no << std::endl;
             continue;
         }
         
-        job_queue.push_back({algo, hash, input_len});
-    }
-
-    file.close();
-
-    std::cout << "Successfully loaded " << job_queue.size() << " target hashes. Beginning batch processing" << std::endl;
-    
-    if (expected_algo == "md5")
-    {
-        md5(job_queue);
-    }
-    else if (expected_algo == "sha1")
-    {
-        sha1(job_queue);
-    }
-    
-    std::cout << "Batch processing complete." << std::endl;
-}
-
-void process_dictionary(std::string filename, std::string algo, std::string hash) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cout << "Failed to open batch file: " << filename << std::endl;
-        return;
-    }
-
-    std::string line;
-    std::vector<std::string> passwords;
-
-    while (std::getline(file, line)) {
-        
-        if (line.empty()) continue; 
-
         passwords.push_back(line);
     }
-
-    file.close();
-
-    std::cout << "Successfully loaded " << passwords.size() << " passwords. Beginning dictionary attack" << std::endl;
-    
-    if (algo == "md5")
-    {
-        std::vector<std::string> hashes;
-        hashes.push_back(hash);
-        md5_dict(passwords,hashes);
-    }
-    else if (algo == "sha1")
-    {
-        std::vector<std::string> hashes;
-        hashes.push_back(hash);
-        sha1_dict(passwords,hashes);
-    }
-    
-    std::cout << "Attack complete." << std::endl;
+    return true;
 }
 
-int main(int argc, char *argv[])
+bool load_brute_batch(const std::string& filename, std::vector<Job>& jobs, std::string& algo) 
 {
-    if(argc < 3) {
-        std::cout << "Usage:" << std::endl;
-        std::cout << "  Single: ./crack <algo> <hash> <len>" << std::endl;
-        std::cout << "  Batch:  ./crack batch <filename>" << std::endl;
-        return 0;
-    }
-
-    if (argc == 3 && strcmp(argv[1], "batch") == 0) {
-        process_batch(argv[2]);
-        return 0;
-    }
-    else if(argc == 4) {
-        std::string algo = argv[1];
-        std::string hash = argv[2];
-        int input_len = atoi(argv[3]);
-        
-        if (algo == "md5") {
-            if (hash.length() != 32) {
-                std::cout << "Invalid hash size" << std::endl;
-                return 0;
-            }
-            if (input_len + 1 > MAX_PWD_SIZE) {
-                std::cout << "Invalid size" << std::endl;
-                return 0;
-            }
-            std::vector<Job> jobs = {{algo, hash, input_len}};
-            md5(jobs);
-        }
-        else if (algo == "sha1") {
-            if (hash.length() != 40) {
-                std::cout << "Invalid hash size" << std::endl;
-                return 0;
-            }
-            if (input_len + 1 > MAX_PWD_SIZE) {
-                std::cout << "Invalid size" << std::endl;
-                return 0;
-            }
-            std::vector<Job> jobs = {{algo, hash, input_len}};
-            sha1(jobs);
-        }
-        else {
-            std::cout << "Invalid Algo" << std::endl;
-        }
-    }
-    else if (argc == 5 && strcmp(argv[1], "dict") == 0)
+    std::ifstream file(filename);
+    if (!file.is_open()) 
     {
-        std::string file = argv[2];
-        std::string algo = argv[3];
-        std::string hash = argv[4];
-
-        if (algo == "md5" && hash.length() == 32)
+        std::cout << "Failed to open batch file: " << filename << std::endl;
+        return false;
+    }
+    
+    std::string line;
+    int line_no=0;
+    while (std::getline(file, line)) 
+    {
+        line_no++;
+        if (line.empty()) continue; 
+        
+        std::istringstream iss(line);
+        std::string hash;
+        int len;
+        
+        if (iss >> hash >> len) 
         {
-            process_dictionary(file,"md5",hash);
-        }
-        else if (algo == "sha1" && hash.length() == 40)
-        {
-            process_dictionary(file,"md5",hash);
-        }
-        else
-        {
-            std::cout << "Invalid algo or hash size" << std::endl;
+            if ((algo == "md5" && hash.length() != 32) || (algo == "sha1" && hash.length() != 40)) 
+            {
+                std::cout << "Invalid hash size for " << algo << " on line number " << line_no << std::endl;
+                continue;
+            }
+            jobs.push_back({hash, len});
         }
     }
-    else {
-        std::cout << "Usage:" << std::endl;
-        std::cout << "> Single:      ./crack <algo> <hash> <len>" << std::endl;
-        std::cout << "> Batch:       ./crack batch <filename>" << std::endl;
-        std::cout << "> Dictionary:  ./crack dict <filename> <algo> <hash>" << std::endl;
+    return true;
+}
+
+bool load_dict_batch(const std::string& filename, std::vector<std::string>& hashes, std::string& algo) 
+{
+    std::ifstream file(filename);
+    if (!file.is_open()) 
+    {
+        std::cout << "Failed to open batch file: " << filename << std::endl;
+        return false;
+    }
+    
+    std::string line;
+    int line_no=0;
+    while (std::getline(file, line)) 
+    {
+        line_no++;
+        if (line.empty()) continue; 
+        
+        std::istringstream iss(line);
+        std::string hash;
+        
+        if (iss >> hash) 
+        {
+            if ((algo == "md5" && hash.length() != 32) || (algo == "sha1" && hash.length() != 40)) 
+            {
+                std::cout << "Invalid hash size for " << algo << " on line number " << line_no << std::endl;
+                continue;
+            }
+            hashes.push_back(hash);
+        }
+    }
+    return true;
+}
+
+void print_usage() {
+    std::cout << "Usage:\n";
+    std::cout << "> Single Brute:  ./crack <algo> <hash> <len>\n";
+    std::cout << "> Batch Brute:   ./crack <algo> batch <filename>\n";
+    std::cout << "> Single Dict:   ./crack <algo> dict <dict_file> <hash>\n";
+    std::cout << "> Batch Dict:    ./crack <algo> dict <dict_file> batch <filename>\n";
+}
+
+int main(int argc, char *argv[]) 
+{
+    if (argc < 4) 
+    {
+        print_usage();
         return 0;
     }
+
+    std::string algo = argv[1];
+    if (algo != "md5" && algo != "sha1") 
+    {
+        std::cout << "Invalid algorithm. Supported: md5, sha1" << std::endl;
+        return 0;
+    }
+
+    std::string mode = argv[2];
+
+    if (mode == "batch" && argc == 4) 
+    {
+        std::vector<Job> jobs;
+        if (load_brute_batch(argv[3], jobs, algo)) 
+        {
+            std::cout << "Successfully loaded " << jobs.size() << " target hashes" << std::endl;
+            if (algo == "md5") md5(jobs);
+            else sha1(jobs);
+            return 0;
+        }
+        return 0;
+    }
+
+    if (mode == "dict" && argc >= 5) 
+    {
+        std::string dict_file = argv[3];
+        std::vector<std::string> passwords;
+        
+        if (!load_passwords(dict_file, passwords)) return 0;
+
+        std::string type = argv[4];
+
+        if (type == "batch" && argc == 6) 
+        {
+            std::vector<std::string> hashes;
+            if (load_dict_batch(argv[5], hashes, algo)) 
+            {
+                std::cout << "Successfully loaded " << passwords.size() << " passwords and " << hashes.size() << " target hashes" << std::endl;
+                if (algo == "md5") md5_dict(passwords, hashes);
+                else sha1_dict(passwords, hashes);
+            }
+            return 0;
+        }
+
+        if (argc == 5) 
+        {
+            if ((algo == "md5" && type.length() != 32) || (algo == "sha1" && type.length() != 40)) 
+            {
+                std::cout << "Invalid hash size for " << algo << std::endl;
+                return 0;
+            }
+            
+            std::cout << "Successfully loaded " << passwords.size() << " passwords" << std::endl;
+            std::vector<std::string> hashes = {type};
+            if (algo == "md5") md5_dict(passwords, hashes);
+            else sha1_dict(passwords, hashes);
+            
+            return 0;
+        }
+    }
+
+    if (mode != "batch" && mode != "dict" && argc == 4) 
+    {
+        std::string hash = argv[2];
+        int input_len = std::atoi(argv[3]);
+        
+        if ((algo == "md5" && hash.length() != 32) || (algo == "sha1" && hash.length() != 40)) 
+        {
+            std::cout << "Invalid hash size for " << algo << std::endl;
+            return 0;
+        }
+        if (input_len + 1 > MAX_PWD_SIZE) 
+        {
+            std::cout << "Invalid size. Max length is " << MAX_PWD_SIZE - 1 << std::endl;
+            return 0;
+        }
+
+        std::vector<Job> jobs = {{hash, input_len}};
+        if (algo == "md5") md5(jobs);
+        else sha1(jobs);
+        
+        return 0;
+    }
+
+    std::cout << "Invalid command combination" << std::endl;
+    print_usage();
+    return 0;
 }

@@ -10,7 +10,6 @@
 #define MAX_PWD_SIZE_DICT 16
 
 struct Job {
-    std::string algo;
     std::string hash;
     int input_len;
 };

@@ -215,13 +215,16 @@ void md5(std::vector<Job>& jobs)
             cudaMemcpy(found_host, found_gpu, current_batch * sizeof(int), cudaMemcpyDeviceToHost);
             cudaMemcpy(passwords_host, passwords_gpu, current_batch * MAX_PWD_SIZE, cudaMemcpyDeviceToHost);
 
+            int f = 0;
             for (int i = 0; i < current_batch; i++) 
             {
                 if (found_host[i]) 
                 {
+                    f = 1;
                     std::cout << "Match found - Hash: " << pair.second[offset + i] << " -> Password: " << passwords_host[i] << std::endl;
                 }
             }
+            if(!f) std::cout << "No match found"<< std::endl;
 
             cudaFree(passwords_gpu);
             cudaFree(found_gpu);
@@ -342,13 +345,16 @@ void md5_dict(std::vector<std::string>& passwords, std::vector<std::string>& has
     cudaMemcpy(founds_host, founds_gpu, total_targets * sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(results_host, results_gpu, total_targets * MAX_PWD_SIZE_DICT, cudaMemcpyDeviceToHost);
 
+    int f = 0;
     for (int i = 0; i < total_targets; i++) 
     {
         if (founds_host[i]) 
         {
+            f = 1;
             std::cout << "Match found - Hash: " << hashes[i] << " -> Password: " << (results_host + i * MAX_PWD_SIZE_DICT) << std::endl;
         }
     }
+    if(!f) std::cout << "No match found"<< std::endl;
 
     cudaFree(target_hashes_gpu);
     cudaFree(founds_gpu);
