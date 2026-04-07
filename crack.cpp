@@ -20,6 +20,9 @@ bool load_passwords(const std::string& filename, std::vector<std::string>& passw
     {
         line_no++;
         if (line.empty()) continue;
+
+        if (line.back() == '\r') line.pop_back();
+        
         if (line.length() > MAX_PWD_SIZE_DICT)
         {
             std::cout << "Invalid password size on line number" << line_no << std::endl;
@@ -132,8 +135,18 @@ int main(int argc, char *argv[])
                 return 0;
             }
             std::cout << "Successfully loaded " << jobs.size() << " target hashes" << std::endl;
-            if (algo == "md5") md5(jobs);
-            else sha1(jobs);
+
+            #ifdef ONLY_MD5
+                if (algo == "md5") md5(jobs);
+                else std::cout << "Error: Compiled for MD5 only.\n";
+            #elif defined(ONLY_SHA1)
+                if (algo == "sha1") sha1(jobs);
+                else std::cout << "Error: Compiled for SHA1 only.\n";
+            #else
+                if (algo == "md5") md5(jobs);
+                else if (algo == "sha1") sha1(jobs);
+            #endif
+            
             return 0;
         }
         return 0;
@@ -165,8 +178,18 @@ int main(int argc, char *argv[])
                     return 0;
                 }
                 std::cout << "Successfully loaded " << passwords.size() << " passwords and " << hashes.size() << " target hashes" << std::endl;
+                
+                #ifdef ONLY_MD5
                 if (algo == "md5") md5_dict(passwords, hashes);
-                else sha1_dict(passwords, hashes);
+                    else std::cout << "Error: Compiled for MD5 only.\n";
+                #elif defined(ONLY_SHA1)
+                    if (algo == "sha1") sha1_dict(passwords, hashes);
+                    else std::cout << "Error: Compiled for SHA1 only.\n";
+                #else
+                    if (algo == "md5") md5_dict(passwords, hashes);
+                    else sha1_dict(passwords, hashes);
+                #endif
+
             }
             return 0;
         }
@@ -181,8 +204,17 @@ int main(int argc, char *argv[])
             
             std::cout << "Successfully loaded " << passwords.size() << " passwords" << std::endl;
             std::vector<std::string> hashes = {type};
-            if (algo == "md5") md5_dict(passwords, hashes);
-            else sha1_dict(passwords, hashes);
+
+            #ifdef ONLY_MD5
+                if (algo == "md5") md5_dict(passwords, hashes);
+                else std::cout << "Error: Compiled for MD5 only.\n";
+            #elif defined(ONLY_SHA1)
+                if (algo == "sha1") sha1_dict(passwords, hashes);
+                else std::cout << "Error: Compiled for SHA1 only.\n";
+            #else
+                if (algo == "md5") md5_dict(passwords, hashes);
+                else sha1_dict(passwords, hashes);
+            #endif
             
             return 0;
         }
@@ -205,8 +237,16 @@ int main(int argc, char *argv[])
         }
 
         std::vector<Job> jobs = {{hash, input_len}};
-        if (algo == "md5") md5(jobs);
-        else sha1(jobs);
+        #ifdef ONLY_MD5
+            if (algo == "md5") md5(jobs);
+            else std::cout << "Error: Compiled for MD5 only.\n";
+        #elif defined(ONLY_SHA1)
+            if (algo == "sha1") sha1(jobs);
+            else std::cout << "Error: Compiled for SHA1 only.\n";
+        #else
+            if (algo == "md5") md5(jobs);
+            else if (algo == "sha1") sha1(jobs);
+        #endif
         
         return 0;
     }
